@@ -6,6 +6,7 @@
 Basic example for a bot that uses inline keyboards. For an in-depth explanation, check out
  https://github.com/python-telegram-bot/python-telegram-bot/wiki/InlineKeyboard-Example.
 """
+import json
 import logging
 import requests
 
@@ -73,7 +74,7 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(f"You entered the city: {city_name}. Now I will retrieve the weather for this city.")
 
         keyboard = [
-            [InlineKeyboardButton("Show in Fahrenheit", callback_data='fahrenheit')],
+            [InlineKeyboardButton("Show in Fahrenheit", callback_data=json.dumps({'parameter': 'fahrenheit', 'value': weather['celcius'], 'city': city_name}))],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -88,41 +89,30 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles button press to toggle temperature units."""
     query = update.callback_query
-    data = query.data
+    data = json.loads(query.data)
     print(data)
-    if data == "fahrenheit":
-        # Retrieve the city name and fetch weather data again
-        city_name = query.message.text.split("The temperature in ")[1].split(" is")[0]
-        print(city_name)
-        weather = await get_weather(city_name)
-        print(weather)
+    if data.get("parameter") == "fahrenheit":
+        # convert the data to a farhenheit value
+        fahrenheit = float("{:.2f}".format((data.get('value') * 9/5) + 32))
 
-        if weather.get("status") == "error":
-            await query.message.reply_text("City not found. Please enter a valid city name.")
-            return
 
         keyboard = [
-            [InlineKeyboardButton("Show in Celcius", callback_data='celcius')],
+            [InlineKeyboardButton("Show in Celcius", callback_data=json.dumps({'parameter': 'celcius', 'value': fahrenheit, 'city': data.get('city')}))],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         # Update the message with temperature in Fahrenheit
-        await query.edit_message_text(f"The temperature in {city_name} is {weather['fahrenheit']}°F", reply_markup=reply_markup)
+        await query.edit_message_text(f"The temperature in {data.get('city')} is {fahrenheit}°F", reply_markup=reply_markup)
 
-    if data == "celcius":
-        # Retrieve the city name and fetch weather data again
-        city_name = query.message.text.split("The temperature in ")[1].split(" is")[0]
-        weather = await get_weather(city_name)
+    if data.get("parameter") == "celcius":
 
-        if weather.get("status") == "error":
-            await query.message.reply_text("City not found. Please enter a valid city name.")
-            return
+        celcius = float("{:.2f}".format((data.get('value') - 32) * 5/9))
 
         keyboard = [
-            [InlineKeyboardButton("Show in Fahrenheit", callback_data='fahrenheit')],
+            [InlineKeyboardButton("Show in Fahrenheit", callback_data=json.dumps({'parameter': 'fahrenheit', 'value': celcius, 'city': data.get('city')}))],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         # Update the message with temperature in Fahrenheit
-        await query.edit_message_text(f"The temperature in {city_name} is {weather['celcius']}°C", reply_markup=reply_markup)
+        await query.edit_message_text(f"The temperature in {data.get('city')} is {celcius}°C", reply_markup=reply_markup)
 
     # Answer the callback query
     await query.answer()
